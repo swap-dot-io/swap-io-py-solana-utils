@@ -5,19 +5,19 @@ Utilities for working with Solana transactions
 ## Installation
 
 ```bash
-pip install solana-tx-utils
+pip install swap-io-py-solana-utils
 ```
 
 Or install from source:
 
 ```bash
-pip install git+https://github.com/swap-dot-io/solana-tx-utils.git
+pip install git+https://github.com/swap-dot-io/swap-io-py-solana-utils.git
 ```
 
 ## Usage
 
 ```python
-from solana_tx_utils import get_base64_tx_message_hash
+from swap_io_py_solana_utils import get_base64_tx_message_hash
 
 # Get transaction message hash from base64-encoded transaction
 base64_tx = "your_base64_encoded_transaction_here"
@@ -28,7 +28,7 @@ print(f"Transaction hash: {tx_hash}")
 ### Working with transaction objects directly
 
 ```python
-from solana_tx_utils import get_tx_message_hash, try_build_versioned_tx, try_build_legacy_tx
+from swap_io_py_solana_utils import get_tx_message_hash, try_build_versioned_tx, try_build_legacy_tx
 
 # Build transaction from raw bytes
 raw_bytes = b"..."
@@ -41,20 +41,35 @@ if tx:
 
 ## API
 
-### `get_base64_tx_message_hash(base64_tx: str) -> str`
+### `get_base64_tx_message_hash(base64_tx: str, algorithm: str = "sha256") -> str`
 
-Computes the SHA-256 hash of a transaction message from a base64-encoded transaction string.
+Computes the hash of a transaction message from a base64-encoded transaction string.
 
-- **Parameters:** `base64_tx` - Base64-encoded Solana transaction
-- **Returns:** Hex-encoded SHA-256 hash of the transaction message
-- **Raises:** `ValueError` if the input is invalid
+- **Parameters:**
+  - `base64_tx` - Base64-encoded Solana transaction
+  - `algorithm` - Hash algorithm to use (default: "sha256")
+- **Returns:** Hex-encoded hash of the transaction message
+- **Raises:** `ValueError` if the input is invalid or algorithm is unsupported
 
-### `get_tx_message_hash(tx_object: Transaction | VersionedTransaction) -> str`
+### `get_base58_tx_message_hash(base58_tx: str, algorithm: str = "sha256") -> str`
 
-Computes the SHA-256 hash of a transaction message from a transaction object.
+Computes the hash of a transaction message from a base58-encoded transaction string.
 
-- **Parameters:** `tx_object` - Solana transaction object (legacy or versioned)
-- **Returns:** Hex-encoded SHA-256 hash of the transaction message
+- **Parameters:**
+  - `base58_tx` - Base58-encoded Solana transaction
+  - `algorithm` - Hash algorithm to use (default: "sha256")
+- **Returns:** Hex-encoded hash of the transaction message
+- **Raises:** `ValueError` if the input is invalid or algorithm is unsupported
+
+### `get_tx_message_hash(tx_object: Transaction | VersionedTransaction, algorithm: str = "sha256") -> str`
+
+Computes the hash of a transaction message from a transaction object.
+
+- **Parameters:**
+  - `tx_object` - Solana transaction object (legacy or versioned)
+  - `algorithm` - Hash algorithm to use (default: "sha256")
+- **Returns:** Hex-encoded hash of the transaction message
+- **Raises:** `ValueError` if the algorithm is unsupported
 
 ### `try_build_versioned_tx(tx_raw_bytes: bytes) -> VersionedTransaction | None`
 
@@ -74,6 +89,7 @@ Attempts to build a legacy transaction from raw bytes.
 
 - Python >= 3.10
 - solders >= 0.18.0
+- base58 >= 2.1.1
 
 ## License
 

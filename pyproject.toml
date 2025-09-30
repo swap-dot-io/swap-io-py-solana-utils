@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "solana-tx-utils"
+name = "swap-io-py-solana-utils"
 version = "0.1.0"
 description = "Utilities for working with Solana transactions"
 readme = "README.md"
@@ -28,6 +28,6 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/swap-dot-io/solana-tx-utils"
-Repository = "https://github.com/swap-dot-io/solana-tx-utils"
-Issues = "https://github.com/swap-dot-io/solana-tx-utils/issues"
+Homepage = "https://github.com/swap-dot-io/swap-io-py-solana-utils"
+Repository = "https://github.com/swap-dot-io/swap-io-py-solana-utils"
+Issues = "https://github.com/swap-dot-io/swap-io-py-solana-utils/issues"
