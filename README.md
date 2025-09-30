@@ -1,6 +1,6 @@
-# Solana TX Utils
+# Solana utils
 
-Utilities for working with Solana transactions
+Utilities for working with Solana
 
 ## Installation
 
