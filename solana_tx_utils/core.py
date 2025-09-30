@@ -1,6 +1,7 @@
 import base64
 import hashlib
 
+import base58
 from solders.message import to_bytes_versioned
 from solders.transaction import Transaction, VersionedTransaction
 
@@ -35,3 +36,16 @@ def get_base64_tx_message_hash(base64_tx: str) -> str:
         return get_tx_message_hash(tx_object)
 
     raise ValueError(f"Invalid base64 transaction: {base64_tx}")
+
+
+def get_base58_tx_message_hash(base58_tx: str) -> str:
+    try:
+        raw_bytes = base58.b58decode(base58_tx)
+    except Exception as e:
+        raise ValueError(f"Invalid base58: {e}")
+
+    tx_object = try_build_versioned_tx(raw_bytes) or try_build_legacy_tx(raw_bytes)
+    if tx_object:
+        return get_tx_message_hash(tx_object)
+
+    raise ValueError(f"Invalid base58 transaction: {base58_tx}")
