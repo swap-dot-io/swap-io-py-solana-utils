@@ -20,12 +20,15 @@ def try_build_legacy_tx(tx_raw_bytes: bytes) -> Transaction | None:
         pass
 
 
-def get_tx_message_hash(tx_object: Transaction | VersionedTransaction) -> str:
+def get_tx_message_hash(tx_object: Transaction | VersionedTransaction, algorithm: str = "sha256") -> str:
     message_bytes = to_bytes_versioned(tx_object.message)
-    return hashlib.sha256(message_bytes).digest().hex()
+    hash_func = getattr(hashlib, algorithm, None)
+    if hash_func is None:
+        raise ValueError(f"Unsupported hash algorithm: {algorithm}")
+    return hash_func(message_bytes).hexdigest()
 
 
-def get_base64_tx_message_hash(base64_tx: str) -> str:
+def get_base64_tx_message_hash(base64_tx: str, algorithm: str = "sha256") -> str:
     try:
         raw_bytes = base64.b64decode(base64_tx, validate=True)
     except Exception as e:
@@ -33,12 +36,12 @@ def get_base64_tx_message_hash(base64_tx: str) -> str:
 
     tx_object = try_build_versioned_tx(raw_bytes) or try_build_legacy_tx(raw_bytes)
     if tx_object:
-        return get_tx_message_hash(tx_object)
+        return get_tx_message_hash(tx_object, algorithm)
 
     raise ValueError(f"Invalid base64 transaction: {base64_tx}")
 
 
-def get_base58_tx_message_hash(base58_tx: str) -> str:
+def get_base58_tx_message_hash(base58_tx: str, algorithm: str = "sha256") -> str:
     try:
         raw_bytes = base58.b58decode(base58_tx)
     except Exception as e:
@@ -46,6 +49,6 @@ def get_base58_tx_message_hash(base58_tx: str) -> str:
 
     tx_object = try_build_versioned_tx(raw_bytes) or try_build_legacy_tx(raw_bytes)
     if tx_object:
-        return get_tx_message_hash(tx_object)
+        return get_tx_message_hash(tx_object, algorithm)
 
     raise ValueError(f"Invalid base58 transaction: {base58_tx}")
