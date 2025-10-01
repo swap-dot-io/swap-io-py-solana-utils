@@ -1,6 +1,6 @@
 """Solana transaction utilities."""
 
-from .core import (
+from .hash import (
     get_base64_tx_message_hash,
     get_base58_tx_message_hash,
     get_tx_message_hash,
@@ -8,7 +8,7 @@ from .core import (
     try_build_versioned_tx,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
     "get_base64_tx_message_hash",
     "get_base58_tx_message_hash",
