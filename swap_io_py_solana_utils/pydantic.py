@@ -178,7 +178,7 @@ class Transaction(BaseModel):
         return v or []
 
 
-class TransactionInfo(BaseModel):
+class SubscribeUpdateTransactionInfo(BaseModel):
     signature: str
     is_vote: bool = False
     transaction: Optional[Transaction] = None
@@ -198,7 +198,7 @@ class MessageHash(BaseModel):
     algorithm: str
 
 
-class TransactionModel(BaseModel):
-    transaction: Optional[TransactionInfo] = None
+class SubscribeUpdateTransaction(BaseModel):
+    transaction: Optional[SubscribeUpdateTransactionInfo] = None
     slot: int = 0
     message_hash: Optional[MessageHash] = None
