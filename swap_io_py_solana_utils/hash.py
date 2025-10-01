@@ -6,7 +6,7 @@ from solders.message import to_bytes_versioned
 from solders.transaction import (Transaction as SoldersLegacyTransaction,
                                  VersionedTransaction as SoldersVersionedTransaction)
 
-from core import try_build_versioned_tx_from_bytes, try_build_legacy_tx_from_bytes
+from .core import try_build_versioned_tx_from_bytes, try_build_legacy_tx_from_bytes
 
 DEFAULT_ALGORITHM = "sha256"
 

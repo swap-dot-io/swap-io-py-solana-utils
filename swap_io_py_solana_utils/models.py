@@ -9,8 +9,8 @@ from solders.solders import Message as SoldersMessage, MessageV0 as SoldersMessa
 from solders.transaction import (Transaction as SoldersLegacyTransaction,
                                  VersionedTransaction as SoldersVersionedTransaction)
 
-from hash import DEFAULT_ALGORITHM, get_tx_message_hash
-from swap_io_py_solana_utils.core import try_build_versioned_tx_from_base64, try_build_legacy_tx_from_base64, \
+from .hash import DEFAULT_ALGORITHM, get_tx_message_hash
+from .core import try_build_versioned_tx_from_base64, try_build_legacy_tx_from_base64, \
     try_build_versioned_tx_from_base58, try_build_legacy_tx_from_base58
 
 
