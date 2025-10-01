@@ -1,9 +1,17 @@
 """
 Pydantic models for Solana transaction data with base58 decoding support.
 """
-from typing import List, Optional
+from typing import List, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 import base58
+
+from solders.solders import Message as SoldersMessage, MessageV0 as SoldersMessageV0
+from solders.transaction import (Transaction as SoldersLegacyTransaction,
+                                 VersionedTransaction as SoldersVersionedTransaction)
+
+from hash import DEFAULT_ALGORITHM, get_tx_message_hash
+from swap_io_py_solana_utils.core import try_build_versioned_tx_from_base64, try_build_legacy_tx_from_base64, \
+    try_build_versioned_tx_from_base58, try_build_legacy_tx_from_base58
 
 
 class MessageHeader(BaseModel):
@@ -65,9 +73,9 @@ class InnerInstructions(BaseModel):
 
 
 class Message(BaseModel):
-    header: Optional[MessageHeader] = None
+    header: MessageHeader
     account_keys: List[str] = Field(default_factory=list)
-    recent_blockhash: str = ""
+    recent_blockhash: str
     instructions: List[CompiledInstruction] = Field(default_factory=list)
     versioned: bool = False
     address_table_lookups: List[MessageAddressTableLookup] = Field(default_factory=list)
@@ -168,7 +176,7 @@ class TransactionStatusMeta(BaseModel):
 
 class Transaction(BaseModel):
     signatures: List[str] = Field(default_factory=list)
-    message: Optional[Message] = None
+    message: Message
 
     @field_validator('signatures', mode='before')
     @classmethod
@@ -179,15 +187,17 @@ class Transaction(BaseModel):
 
 
 class SubscribeUpdateTransactionInfo(BaseModel):
-    signature: str
+    transaction: Transaction
+    signature: Optional[str] = None
     is_vote: bool = False
-    transaction: Optional[Transaction] = None
     meta: Optional[TransactionStatusMeta] = None
-    index: int = 0
+    index: Optional[int] = None
 
     @field_validator('signature', mode='before')
     @classmethod
     def decode_signature(cls, v):
+        if v is None:
+            return None
         if isinstance(v, bytes):
             return base58.b58encode(v).decode('utf-8')
         return v
@@ -195,10 +205,99 @@ class SubscribeUpdateTransactionInfo(BaseModel):
 
 class MessageHash(BaseModel):
     value: str
-    algorithm: str
+    algorithm: str = DEFAULT_ALGORITHM
 
 
 class SubscribeUpdateTransaction(BaseModel):
-    transaction: Optional[SubscribeUpdateTransactionInfo] = None
-    slot: int = 0
-    message_hash: Optional[MessageHash] = None
+    transaction: SubscribeUpdateTransactionInfo
+    message_hash: MessageHash
+    slot: Optional[int] = None
+
+    @classmethod
+    def from_base64_transaction(
+        cls,
+        base64_transaction: str,
+        message_hash_algorithm: str = DEFAULT_ALGORITHM,
+    ) -> "SubscribeUpdateTransaction":
+        transaction = (try_build_versioned_tx_from_base64(base64_transaction, raise_on_error=False)
+                       or try_build_legacy_tx_from_base64(base64_transaction, raise_on_error=False))
+        if transaction:
+            return cls.from_solders_transaction(transaction, message_hash_algorithm)
+        raise ValueError(f"Could not decode transaction: {base64_transaction}")
+
+    @classmethod
+    def from_base58_transaction(
+        cls,
+        base58_transaction: str,
+        message_hash_algorithm: str = DEFAULT_ALGORITHM,
+    ) -> "SubscribeUpdateTransaction":
+        transaction = (try_build_versioned_tx_from_base58(base58_transaction, raise_on_error=False)
+                       or try_build_legacy_tx_from_base58(base58_transaction, raise_on_error=False))
+        if transaction:
+            return cls.from_solders_transaction(transaction, message_hash_algorithm)
+        raise ValueError(f"Could not decode transaction: {base58_transaction}")
+
+    @classmethod
+    def from_solders_transaction(
+        cls,
+        solders_transaction: Union[SoldersLegacyTransaction, SoldersVersionedTransaction],
+        message_hash_algorithm: str = DEFAULT_ALGORITHM,
+    ) -> "SubscribeUpdateTransaction":
+        message = solders_transaction.message
+        message: Union[SoldersMessage, SoldersMessageV0]
+
+        header = MessageHeader(
+            num_required_signatures=message.header.num_required_signatures,
+            num_readonly_signed_accounts=message.header.num_readonly_signed_accounts,
+            num_readonly_unsigned_accounts=message.header.num_readonly_unsigned_accounts,
+        )
+
+        account_keys = [str(key) for key in message.account_keys]
+
+        recent_blockhash = str(message.recent_blockhash)
+
+        instructions = []
+        for instr in message.instructions:
+            instructions.append(CompiledInstruction(
+                program_id_index=instr.program_id_index,
+                accounts=bytes(instr.accounts).hex(),
+                data=bytes(instr.data).hex(),
+            ))
+
+        versioned = hasattr(message, 'address_table_lookups')
+        address_table_lookups = []
+        if versioned:
+            message: SoldersMessageV0
+            for lookup in message.address_table_lookups:
+                address_table_lookups.append(MessageAddressTableLookup(
+                    account_key=str(lookup.account_key),
+                    writable_indexes=bytes(lookup.writable_indexes).hex(),
+                    readonly_indexes=bytes(lookup.readonly_indexes).hex(),
+                ))
+
+        msg = Message(
+            header=header,
+            account_keys=account_keys,
+            recent_blockhash=recent_blockhash,
+            instructions=instructions,
+            versioned=versioned,
+            address_table_lookups=address_table_lookups,
+        )
+
+        signatures = [str(sig) for sig in solders_transaction.signatures]
+        transaction = Transaction(
+            signatures=signatures,
+            message=msg,
+        )
+
+        message_hash = MessageHash(
+            value=get_tx_message_hash(solders_transaction, message_hash_algorithm),
+            algorithm=message_hash_algorithm,
+        )
+
+        tx_info = SubscribeUpdateTransactionInfo(transaction=transaction)
+
+        return cls(
+            transaction=tx_info,
+            message_hash=message_hash,
+        )
