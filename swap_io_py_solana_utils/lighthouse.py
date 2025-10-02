@@ -49,7 +49,10 @@ def build_transaction_without_lighthouse(solders_transaction: Union[SoldersLegac
     # Rebuild message and transaction
     if isinstance(solders_transaction, SoldersVersionedTransaction):
         new_msg = MessageV0.try_compile(msg.account_keys[0], instructions, [], msg.recent_blockhash)
-        return SoldersVersionedTransaction(new_msg, [])
+        # Create empty signatures for required signers
+        from solders.signature import Signature
+        empty_sigs = [Signature.default()] * new_msg.header.num_required_signatures
+        return SoldersVersionedTransaction(new_msg, empty_sigs)
     else:
         new_msg = Message.new_with_blockhash(instructions, msg.account_keys[0], msg.recent_blockhash)
         return SoldersLegacyTransaction.new_unsigned(new_msg)
