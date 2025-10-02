@@ -1,13 +1,14 @@
 from typing import Union
 from solders.solders import Pubkey
 from solders.instruction import Instruction, AccountMeta
-from solders.message import Message
-from solders.transaction import Transaction
+from solders.message import Message, MessageV0
+from solders.transaction import (Transaction as SoldersLegacyTransaction,
+                                 VersionedTransaction as SoldersVersionedTransaction)
 
 LIGHTHOUSE_PUBKEY = Pubkey.from_string("L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95")
 
 
-def build_transaction_without_lighthouse(solders_transaction: Union[Transaction]) -> Transaction:
+def build_transaction_without_lighthouse(solders_transaction: Union[SoldersLegacyTransaction, SoldersVersionedTransaction]) -> Union[SoldersLegacyTransaction, SoldersVersionedTransaction]:
     msg = solders_transaction.message
 
     # Find Lighthouse index
@@ -34,5 +35,9 @@ def build_transaction_without_lighthouse(solders_transaction: Union[Transaction]
         ))
 
     # Rebuild message and transaction
-    new_msg = Message.new_with_blockhash(instructions, msg.account_keys[0], msg.recent_blockhash)
-    return Transaction.new_unsigned(new_msg)
+    if isinstance(solders_transaction, SoldersVersionedTransaction):
+        new_msg = MessageV0.try_compile(msg.account_keys[0], instructions, [], msg.recent_blockhash)
+        return SoldersVersionedTransaction(new_msg, [])
+    else:
+        new_msg = Message.new_with_blockhash(instructions, msg.account_keys[0], msg.recent_blockhash)
+        return SoldersLegacyTransaction.new_unsigned(new_msg)
