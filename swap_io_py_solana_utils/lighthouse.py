@@ -1,6 +1,6 @@
 from typing import Union
 from solders.solders import Pubkey
-from solders.instruction import Instruction, AccountMeta
+from solders.instruction import CompiledInstruction
 from solders.message import Message, MessageV0
 from solders.transaction import (Transaction as SoldersLegacyTransaction,
                                  VersionedTransaction as SoldersVersionedTransaction)
@@ -16,40 +16,56 @@ def build_transaction_without_lighthouse(solders_transaction: Union[SoldersLegac
     if lighthouse_idx is None:
         return solders_transaction
 
-    # Helper to check account properties
-    def is_signer(idx): return idx < msg.header.num_required_signatures
-    def is_writable(idx):
-        if idx < msg.header.num_required_signatures:
-            return idx >= msg.header.num_readonly_signed_accounts
-        return idx < len(msg.account_keys) - msg.header.num_readonly_unsigned_accounts
+    # Remove Lighthouse from account_keys and build index mapping
+    new_account_keys = []
+    index_mapping = {}  # old_idx -> new_idx
+    for i, key in enumerate(msg.account_keys):
+        if i != lighthouse_idx:
+            index_mapping[i] = len(new_account_keys)
+            new_account_keys.append(key)
 
-    # Build instructions without Lighthouse
-    instructions = []
+    # Filter and remap instructions
+    new_instructions = []
     for ci in msg.instructions:
         # Skip if program_id is Lighthouse
         if ci.program_id_index == lighthouse_idx:
             continue
 
-        # Skip if any account is Lighthouse (check only valid indices)
-        if any(i == lighthouse_idx for i in ci.accounts if i < len(msg.account_keys)):
+        # Skip if any account is Lighthouse
+        if lighthouse_idx in ci.accounts:
             continue
 
-        # Build account metas only for valid indices
-        account_metas = []
-        for i in ci.accounts:
-            if i < len(msg.account_keys):
-                account_metas.append(AccountMeta(msg.account_keys[i], is_signer(i), is_writable(i)))
+        # Remap indices
+        new_program_id_index = index_mapping.get(ci.program_id_index)
+        new_accounts = bytes([index_mapping[i] for i in ci.accounts if i in index_mapping])
 
-        instructions.append(Instruction(
-            program_id=msg.account_keys[ci.program_id_index],
-            accounts=account_metas,
+        new_instructions.append(CompiledInstruction(
+            program_id_index=new_program_id_index,
+            accounts=new_accounts,
             data=bytes(ci.data)
         ))
 
-    # Rebuild message and transaction
+    # Rebuild message with new_with_compiled_instructions
     if isinstance(solders_transaction, SoldersVersionedTransaction):
-        new_msg = MessageV0.try_compile(msg.account_keys[0], instructions, [], msg.recent_blockhash)
-        return SoldersVersionedTransaction.populate(new_msg, solders_transaction.signatures)
+        new_msg = MessageV0.try_compile(new_account_keys[0], [], [], msg.recent_blockhash)
+        # Manually reconstruct with filtered data
+        from solders.message import Message as LegacyMessage
+        temp_msg = LegacyMessage.new_with_compiled_instructions(
+            msg.header.num_required_signatures,
+            msg.header.num_readonly_signed_accounts,
+            msg.header.num_readonly_unsigned_accounts,
+            new_account_keys,
+            msg.recent_blockhash,
+            new_instructions
+        )
+        return SoldersLegacyTransaction.populate(temp_msg, solders_transaction.signatures)
     else:
-        new_msg = Message.new_with_blockhash(instructions, msg.account_keys[0], msg.recent_blockhash)
+        new_msg = Message.new_with_compiled_instructions(
+            msg.header.num_required_signatures,
+            msg.header.num_readonly_signed_accounts,
+            msg.header.num_readonly_unsigned_accounts,
+            new_account_keys,
+            msg.recent_blockhash,
+            new_instructions
+        )
         return SoldersLegacyTransaction.populate(new_msg, solders_transaction.signatures)
