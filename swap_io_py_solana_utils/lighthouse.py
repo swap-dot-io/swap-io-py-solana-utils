@@ -1,7 +1,7 @@
 from typing import Union
 from solders.solders import Pubkey
 from solders.instruction import CompiledInstruction
-from solders.message import Message, MessageV0
+from solders.message import Message, MessageV0, MessageHeader
 from solders.transaction import Transaction as SoldersLegacyTransaction, VersionedTransaction as SoldersVersionedTransaction
 
 LIGHTHOUSE_PUBKEY = Pubkey.from_string("L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95")
@@ -24,11 +24,9 @@ def build_transaction_without_lighthouse(
     ]
 
     if isinstance(solders_transaction, SoldersVersionedTransaction):
-        # For VersionedTransaction, need to rebuild MessageV0 with address_table_lookups
-        new_msg = MessageV0.new_with_compiled_instructions(
-            msg.header.num_required_signatures,
-            msg.header.num_readonly_signed_accounts,
-            msg.header.num_readonly_unsigned_accounts,
+        # For VersionedTransaction, rebuild MessageV0 with address_table_lookups
+        new_msg = MessageV0(
+            msg.header,
             list(msg.account_keys),
             msg.recent_blockhash,
             new_instructions,
