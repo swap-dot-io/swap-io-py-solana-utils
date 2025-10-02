@@ -26,11 +26,23 @@ def build_transaction_without_lighthouse(solders_transaction: Union[SoldersLegac
     # Build instructions without Lighthouse
     instructions = []
     for ci in msg.instructions:
-        if ci.program_id_index == lighthouse_idx or lighthouse_idx in ci.accounts:
+        # Skip if program_id is Lighthouse
+        if ci.program_id_index == lighthouse_idx:
             continue
+
+        # Skip if any account is Lighthouse (check only valid indices)
+        if any(i == lighthouse_idx for i in ci.accounts if i < len(msg.account_keys)):
+            continue
+
+        # Build account metas only for valid indices
+        account_metas = []
+        for i in ci.accounts:
+            if i < len(msg.account_keys):
+                account_metas.append(AccountMeta(msg.account_keys[i], is_signer(i), is_writable(i)))
+
         instructions.append(Instruction(
             program_id=msg.account_keys[ci.program_id_index],
-            accounts=[AccountMeta(msg.account_keys[i], is_signer(i), is_writable(i)) for i in ci.accounts],
+            accounts=account_metas,
             data=bytes(ci.data)
         ))
 
