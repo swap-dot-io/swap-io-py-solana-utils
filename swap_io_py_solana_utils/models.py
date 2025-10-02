@@ -2,7 +2,7 @@
 Pydantic models for Solana transaction data with base58 decoding support.
 """
 from typing import List, Optional, Union
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 import base58
 
 from solders.solders import Message as SoldersMessage, MessageV0 as SoldersMessageV0
@@ -21,6 +21,8 @@ class MessageHeader(BaseModel):
 
 
 class MessageAddressTableLookup(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     account_key: str
     writable_indexes: str
     readonly_indexes: str
@@ -41,6 +43,8 @@ class MessageAddressTableLookup(BaseModel):
 
 
 class CompiledInstruction(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     program_id_index: int
     accounts: str
     data: str
@@ -54,6 +58,8 @@ class CompiledInstruction(BaseModel):
 
 
 class InnerInstruction(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     program_id_index: int
     accounts: str
     data: str
@@ -73,6 +79,8 @@ class InnerInstructions(BaseModel):
 
 
 class Message(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     header: MessageHeader
     account_keys: List[str] = Field(default_factory=list)
     recent_blockhash: str
@@ -111,6 +119,8 @@ class TokenBalance(BaseModel):
 
 
 class ReturnData(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     program_id: str
     data: str
 
@@ -138,6 +148,8 @@ class Reward(BaseModel):
 
 
 class TransactionError(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     err: str
 
     @field_validator('err', mode='before')
@@ -149,6 +161,8 @@ class TransactionError(BaseModel):
 
 
 class TransactionStatusMeta(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     err: Optional[TransactionError] = None
     fee: int = 0
     pre_balances: List[int] = Field(default_factory=list)
@@ -175,6 +189,8 @@ class TransactionStatusMeta(BaseModel):
 
 
 class Transaction(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     signatures: List[str] = Field(default_factory=list)
     message: Message
 
@@ -187,6 +203,8 @@ class Transaction(BaseModel):
 
 
 class SubscribeUpdateTransactionInfo(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     transaction: Transaction
     signature: Optional[str] = None
     is_vote: bool = False
