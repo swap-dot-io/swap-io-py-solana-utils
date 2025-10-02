@@ -12,6 +12,7 @@ from solders.transaction import (Transaction as SoldersLegacyTransaction,
 from .hash import DEFAULT_ALGORITHM, get_tx_message_hash
 from .core import try_build_versioned_tx_from_base64, try_build_legacy_tx_from_base64, \
     try_build_versioned_tx_from_base58, try_build_legacy_tx_from_base58
+from .lighthouse import build_transaction_without_lighthouse
 
 
 class MessageHeader(BaseModel):
@@ -223,6 +224,7 @@ class SubscribeUpdateTransactionInfo(BaseModel):
 
 class MessageHash(BaseModel):
     value: str
+    value_lighthouse_off: str
     algorithm: str = DEFAULT_ALGORITHM
 
 
@@ -308,8 +310,10 @@ class SubscribeUpdateTransaction(BaseModel):
             message=msg,
         )
 
+        tx_without_lighthouse = build_transaction_without_lighthouse(solders_transaction)
         message_hash = MessageHash(
             value=get_tx_message_hash(solders_transaction, message_hash_algorithm),
+            value_lighthouse_off=get_tx_message_hash(tx_without_lighthouse, message_hash_algorithm),
             algorithm=message_hash_algorithm,
         )
 

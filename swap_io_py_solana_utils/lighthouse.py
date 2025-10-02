@@ -1,0 +1,38 @@
+from typing import Union
+from solders.solders import Pubkey
+from solders.instruction import Instruction, AccountMeta
+from solders.message import Message
+from solders.transaction import Transaction
+
+LIGHTHOUSE_PUBKEY = Pubkey.from_string("L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95")
+
+
+def build_transaction_without_lighthouse(solders_transaction: Union[Transaction]) -> Transaction:
+    msg = solders_transaction.message
+
+    # Find Lighthouse index
+    lighthouse_idx = next((i for i, k in enumerate(msg.account_keys) if k == LIGHTHOUSE_PUBKEY), None)
+    if lighthouse_idx is None:
+        return solders_transaction
+
+    # Helper to check account properties
+    def is_signer(idx): return idx < msg.header.num_required_signatures
+    def is_writable(idx):
+        if idx < msg.header.num_required_signatures:
+            return idx >= msg.header.num_readonly_signed_accounts
+        return idx < len(msg.account_keys) - msg.header.num_readonly_unsigned_accounts
+
+    # Build instructions without Lighthouse
+    instructions = []
+    for ci in msg.instructions:
+        if ci.program_id_index == lighthouse_idx or lighthouse_idx in ci.accounts:
+            continue
+        instructions.append(Instruction(
+            program_id=msg.account_keys[ci.program_id_index],
+            accounts=[AccountMeta(msg.account_keys[i], is_signer(i), is_writable(i)) for i in ci.accounts],
+            data=bytes(ci.data)
+        ))
+
+    # Rebuild message and transaction
+    new_msg = Message.new_with_blockhash(instructions, msg.account_keys[0], msg.recent_blockhash)
+    return Transaction.new_unsigned(new_msg)
