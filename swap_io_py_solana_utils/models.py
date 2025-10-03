@@ -232,17 +232,19 @@ class SubscribeUpdateTransaction(BaseModel):
     transaction: SubscribeUpdateTransactionInfo
     message_hash: MessageHash
     slot: Optional[int] = None
+    batch_id: Optional[str] = None
 
     @classmethod
     def from_base64_transaction(
         cls,
         base64_transaction: str,
         message_hash_algorithm: str = DEFAULT_ALGORITHM,
+        batch_id: Optional[str] = None,
     ) -> "SubscribeUpdateTransaction":
         transaction = (try_build_versioned_tx_from_base64(base64_transaction, raise_on_error=False)
                        or try_build_legacy_tx_from_base64(base64_transaction, raise_on_error=False))
         if transaction:
-            return cls.from_solders_transaction(transaction, message_hash_algorithm)
+            return cls.from_solders_transaction(transaction, message_hash_algorithm, batch_id)
         raise ValueError(f"Could not decode transaction: {base64_transaction}")
 
     @classmethod
@@ -250,11 +252,12 @@ class SubscribeUpdateTransaction(BaseModel):
         cls,
         base58_transaction: str,
         message_hash_algorithm: str = DEFAULT_ALGORITHM,
+        batch_id: Optional[str] = None,
     ) -> "SubscribeUpdateTransaction":
         transaction = (try_build_versioned_tx_from_base58(base58_transaction, raise_on_error=False)
                        or try_build_legacy_tx_from_base58(base58_transaction, raise_on_error=False))
         if transaction:
-            return cls.from_solders_transaction(transaction, message_hash_algorithm)
+            return cls.from_solders_transaction(transaction, message_hash_algorithm, batch_id)
         raise ValueError(f"Could not decode transaction: {base58_transaction}")
 
     @classmethod
@@ -262,6 +265,7 @@ class SubscribeUpdateTransaction(BaseModel):
         cls,
         solders_transaction: Union[SoldersLegacyTransaction, SoldersVersionedTransaction],
         message_hash_algorithm: str = DEFAULT_ALGORITHM,
+        batch_id: Optional[str] = None,
     ) -> "SubscribeUpdateTransaction":
         message = solders_transaction.message
         message: Union[SoldersMessage, SoldersMessageV0]
@@ -322,4 +326,5 @@ class SubscribeUpdateTransaction(BaseModel):
         return cls(
             transaction=tx_info,
             message_hash=message_hash,
+            batch_id=batch_id,
         )
