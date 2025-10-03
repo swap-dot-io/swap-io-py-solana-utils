@@ -5,7 +5,7 @@ from typing import List, Optional, Union
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 import base58
 
-from solders.solders import Message as SoldersMessage, MessageV0 as SoldersMessageV0
+from solders.message import Message as SoldersMessage, MessageV0 as SoldersMessageV0
 from solders.transaction import (Transaction as SoldersLegacyTransaction,
                                  VersionedTransaction as SoldersVersionedTransaction)
 

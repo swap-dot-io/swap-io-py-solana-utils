@@ -1,5 +1,5 @@
 from typing import Union
-from solders.solders import Pubkey
+from solders.pubkey import Pubkey
 from solders.instruction import CompiledInstruction
 from solders.message import Message, MessageV0, MessageHeader
 from solders.transaction import Transaction as SoldersLegacyTransaction, VersionedTransaction as SoldersVersionedTransaction
