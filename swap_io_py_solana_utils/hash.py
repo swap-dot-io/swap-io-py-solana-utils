@@ -4,7 +4,7 @@ import hashlib
 import base58
 from solders.message import Message
 from solders.pubkey import Pubkey
-from solders.solders import COMPUTE_BUDGET_ID
+from solders.compute_budget import ID as COMPUTE_BUDGET_ID
 from solders.transaction import (Transaction as SoldersLegacyTransaction,
                                  VersionedTransaction as SoldersVersionedTransaction)
 
