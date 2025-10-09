@@ -223,7 +223,6 @@ class SubscribeUpdateTransactionInfo(BaseModel):
 
 class MessageHash(BaseModel):
     value: str
-    value_lighthouse_off: str
     algorithm: str = DEFAULT_ALGORITHM
 
 
@@ -311,9 +310,9 @@ class SubscribeUpdateTransaction(BaseModel):
             message=msg,
         )
 
+        tx_message_hash = get_tx_message_hash(solders_transaction, message_hash_algorithm)
         message_hash = MessageHash(
-            value=get_tx_message_hash(solders_transaction, message_hash_algorithm),
-            value_lighthouse_off=get_tx_message_hash(solders_transaction, message_hash_algorithm, lighthouse_off=True),
+            value=tx_message_hash,
             algorithm=message_hash_algorithm,
         )
 

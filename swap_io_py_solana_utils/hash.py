@@ -4,6 +4,7 @@ import hashlib
 import base58
 from solders.message import Message
 from solders.pubkey import Pubkey
+from solders.solders import COMPUTE_BUDGET_ID
 from solders.transaction import (Transaction as SoldersLegacyTransaction,
                                  VersionedTransaction as SoldersVersionedTransaction)
 
@@ -13,39 +14,22 @@ DEFAULT_ALGORITHM = "sha256"
 LIGHTHOUSE_PROGRAM_ID = Pubkey.from_string("L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95")
 
 
-def _serialize_message(message: Message, lighthouse_off: bool = False) -> bytes:
+def _serialize_message(message: Message) -> bytes:
     """Manually serialize transaction message components."""
     result = bytearray()
 
     # Prepare account keys
     account_keys = list(message.account_keys)
     lighthouse_index = None
+    compute_budget_index = None
 
-    if lighthouse_off:
-        # Find lighthouse program index
-        try:
-            lighthouse_index = account_keys.index(LIGHTHOUSE_PROGRAM_ID)
-        except ValueError:
-            lighthouse_index = None
+    for i, key in enumerate(account_keys):
+        if key == LIGHTHOUSE_PROGRAM_ID:
+            lighthouse_index = i
+        if key == COMPUTE_BUDGET_ID:
+            compute_budget_index = i
 
-    # Filter account keys if needed
-    if lighthouse_off and lighthouse_index is not None:
-        account_keys = [key for key in account_keys if key != LIGHTHOUSE_PROGRAM_ID]
-
-    # Header (3 bytes)
-    num_readonly_unsigned = message.header.num_readonly_unsigned_accounts
-    if lighthouse_off and lighthouse_index is not None:
-        # Check if lighthouse account is readonly unsigned
-        num_signed = message.header.num_required_signatures
-        num_readonly_signed = message.header.num_readonly_signed_accounts
-        readonly_unsigned_start = num_signed + (num_signed - num_readonly_signed)
-        if lighthouse_index >= readonly_unsigned_start:
-            num_readonly_unsigned = max(0, num_readonly_unsigned - 1)
-
-    result.append(message.header.num_required_signatures)
-    result.append(message.header.num_readonly_signed_accounts)
-    result.append(num_readonly_unsigned)
-
+    account_keys = [key for key in account_keys if key not in [LIGHTHOUSE_PROGRAM_ID, COMPUTE_BUDGET_ID]]
     # Sorted account keys
     sorted_keys = sorted(account_keys, key=lambda x: bytes(x))
 
@@ -54,13 +38,17 @@ def _serialize_message(message: Message, lighthouse_off: bool = False) -> bytes:
 
     # Instructions data only
     for ix in message.instructions:
-        # Skip instruction if lighthouse_off and instruction uses lighthouse
-        if lighthouse_off and lighthouse_index is not None:
-            # Check if program_id_index points to lighthouse
-            if ix.program_id_index == lighthouse_index:
+        if lighthouse_index is not None:
+            if (
+                ix.program_id_index == lighthouse_index
+                or lighthouse_index in ix.accounts
+            ):
                 continue
-            # Check if any account index points to lighthouse
-            if lighthouse_index in ix.accounts:
+        if compute_budget_index is not None:
+            if (
+                ix.program_id_index == compute_budget_index
+                or compute_budget_index in ix.accounts
+            ):
                 continue
 
         result.extend(ix.data)
@@ -72,9 +60,8 @@ def _serialize_message(message: Message, lighthouse_off: bool = False) -> bytes:
 
 
 def get_tx_message_hash(tx_object: SoldersLegacyTransaction | SoldersVersionedTransaction,
-                        algorithm: str = DEFAULT_ALGORITHM,
-                        lighthouse_off: bool = False) -> str:
-    message_bytes = _serialize_message(tx_object.message, lighthouse_off=lighthouse_off)
+                        algorithm: str = DEFAULT_ALGORITHM) -> str:
+    message_bytes = _serialize_message(tx_object.message)
     hash_func = getattr(hashlib, algorithm, None)
     if hash_func is None:
         raise ValueError(f"Unsupported hash algorithm: {algorithm}")
@@ -82,8 +69,7 @@ def get_tx_message_hash(tx_object: SoldersLegacyTransaction | SoldersVersionedTr
 
 
 def get_base64_tx_message_hash(base64_tx: str,
-                               algorithm: str = DEFAULT_ALGORITHM,
-                               lighthouse_off: bool = False) -> str:
+                               algorithm: str = DEFAULT_ALGORITHM) -> str:
     try:
         raw_bytes = base64.b64decode(base64_tx, validate=True)
     except Exception as e:
@@ -98,8 +84,7 @@ def get_base64_tx_message_hash(base64_tx: str,
 
 
 def get_base58_tx_message_hash(base58_tx: str,
-                               algorithm: str = DEFAULT_ALGORITHM,
-                               lighthouse_off: bool = False) -> str:
+                               algorithm: str = DEFAULT_ALGORITHM) -> str:
     try:
         raw_bytes = base58.b58decode(base58_tx)
     except Exception as e:
@@ -108,6 +93,6 @@ def get_base58_tx_message_hash(base58_tx: str,
     tx_object = (try_build_versioned_tx_from_bytes(raw_bytes, raise_on_error=False)
                  or try_build_legacy_tx_from_bytes(raw_bytes, raise_on_error=False))
     if tx_object:
-        return get_tx_message_hash(tx_object, algorithm, lighthouse_off=lighthouse_off)
+        return get_tx_message_hash(tx_object, algorithm)
 
     raise ValueError(f"Invalid base58 transaction: {base58_tx}")
