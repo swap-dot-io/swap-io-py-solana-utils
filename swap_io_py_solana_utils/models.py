@@ -2,7 +2,7 @@
 Pydantic models for Solana transaction data with base58 decoding support.
 """
 from typing import List, Optional, Union
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict, field_serializer
 import base58
 
 from solders.message import Message as SoldersMessage, MessageV0 as SoldersMessageV0
@@ -322,3 +322,31 @@ class SubscribeUpdateTransaction(BaseModel):
             transaction=tx_info,
             message_hash=message_hash,
         )
+
+
+class SubscribeUpdateAccountInfo(BaseModel):
+    pubkey: str
+    lamports: int
+    owner: str
+    executable: bool
+    rent_epoch: int
+    data: bytes
+    write_version: int
+    txn_signature: Optional[str] = None
+
+    @field_validator('data', mode='before')
+    @classmethod
+    def parse_data(cls, value):
+        if isinstance(value, str):
+            return bytes.fromhex(value)
+        return value
+
+    @field_serializer('data')
+    def serialize_data(self, value: bytes) -> str:
+        return value.hex()
+
+
+class SubscribeUpdateAccount(BaseModel):
+    account: SubscribeUpdateAccountInfo
+    slot: int
+    is_startup: bool
