@@ -12,44 +12,43 @@ from .core import try_build_versioned_tx_from_bytes, try_build_legacy_tx_from_by
 
 DEFAULT_ALGORITHM = "sha256"
 LIGHTHOUSE_PROGRAM_ID = Pubkey.from_string("L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95")
+SWAP_HELPER_PROGRAM_ID = Pubkey.from_string("7wuFcHkbVckS6nMqZ5pg6ykmw5uWTqzvqK1gdb8xGdp4")
+
+DEFAULT_IGNORE_PROGRAMS = [
+    COMPUTE_BUDGET_ID,
+    LIGHTHOUSE_PROGRAM_ID,
+    SWAP_HELPER_PROGRAM_ID,
+]
 
 
 def _serialize_message(message: Message) -> bytes:
     """Manually serialize transaction message components."""
     result = bytearray()
 
-    # Prepare account keys
+    # Prepare account keys and build ignore index map
     account_keys = list(message.account_keys)
-    lighthouse_index = None
-    compute_budget_index = None
+    ignore_indices = set()
 
     for i, key in enumerate(account_keys):
-        if key == LIGHTHOUSE_PROGRAM_ID:
-            lighthouse_index = i
-        if key == COMPUTE_BUDGET_ID:
-            compute_budget_index = i
+        if key in DEFAULT_IGNORE_PROGRAMS:
+            ignore_indices.add(i)
 
-    account_keys = [key for key in account_keys if key not in [LIGHTHOUSE_PROGRAM_ID, COMPUTE_BUDGET_ID]]
+    # Filter out ignored programs from account keys
+    account_keys = [key for key in account_keys if key not in DEFAULT_IGNORE_PROGRAMS]
     # Sorted account keys
     sorted_keys = sorted(account_keys, key=lambda x: bytes(x))
 
     for key in sorted_keys:
         result.extend(bytes(key))
 
-    # Instructions data only
+    # Instructions data only (skip instructions from ignored programs)
     for ix in message.instructions:
-        if lighthouse_index is not None:
-            if (
-                ix.program_id_index == lighthouse_index
-                or lighthouse_index in ix.accounts
-            ):
-                continue
-        if compute_budget_index is not None:
-            if (
-                ix.program_id_index == compute_budget_index
-                or compute_budget_index in ix.accounts
-            ):
-                continue
+        # Skip if instruction's program is in ignore list
+        if ix.program_id_index in ignore_indices:
+            continue
+        # Skip if any of instruction's accounts reference ignored programs
+        if any(acc_idx in ignore_indices for acc_idx in ix.accounts):
+            continue
 
         result.extend(ix.data)
 
