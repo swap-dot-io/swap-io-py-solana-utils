@@ -22,38 +22,51 @@ DEFAULT_IGNORE_PROGRAMS = [
 
 
 def _serialize_message(message: Message) -> bytes:
-    """Manually serialize transaction message components."""
+    """
+    Creates a consistent 'logical fingerprint' of a transaction message.
+
+    This function ignores volatile data that varies between a locally created
+    Pending transaction and a Finalized transaction returned by RPC nodes
+    (e.g., expanded ALT keys, modified headers, or shifted indices).
+    """
     result = bytearray()
 
-    # Prepare account keys and build ignore index map
-    account_keys = list(message.account_keys)
-    ignore_indices = set()
+    # 1. Recent Blockhash (Time Anchor)
+    # Ensures we are comparing transactions within the same time window.
+    result.extend(bytes(message.recent_blockhash))
 
-    for i, key in enumerate(account_keys):
-        if key in DEFAULT_IGNORE_PROGRAMS:
-            ignore_indices.add(i)
+    # 2. Fee Payer / Signer (Identity Anchor)
+    # The first account at index 0 is ALWAYS the fee payer/signer.
+    # It remains constant even if the RPC node expands the account list with ALT keys.
+    # This distinguishes identical swaps made by different users.
+    if len(message.account_keys) > 0:
+        result.extend(bytes(message.account_keys[0]))
 
-    # Filter out ignored programs from account keys
-    account_keys = [key for key in account_keys if key not in DEFAULT_IGNORE_PROGRAMS]
-    # Sorted account keys
-    sorted_keys = sorted(account_keys, key=lambda x: bytes(x))
-
-    for key in sorted_keys:
-        result.extend(bytes(key))
-
-    # Instructions data only (skip instructions from ignored programs)
+    # 3. Instructions (Action Anchor)
+    # We serialize 'WHAT' is happening (Program + Data), ignoring 'HOW' it's indexed.
     for ix in message.instructions:
-        # Skip if instruction's program is in ignore list
-        if ix.program_id_index in ignore_indices:
-            continue
-        # Skip if any of instruction's accounts reference ignored programs
-        if any(acc_idx in ignore_indices for acc_idx in ix.accounts):
+        # Resolve the actual Program ID using the index.
+        # This fixes issues where indices shift (e.g., ComputeBudget moving from idx 4 to 5).
+        try:
+            program_id = message.account_keys[ix.program_id_index]
+        except IndexError:
+            # Skip malformed instructions if index is out of bounds
             continue
 
+        # Skip infrastructure programs that don't affect the business logic
+        if program_id in DEFAULT_IGNORE_PROGRAMS:
+            continue
+
+        # Serialize Program ID (Who executes)
+        result.extend(bytes(program_id))
+
+        # Serialize Instruction Data (What parameters/amounts)
+        # If the user uses a Memo program for uniqueness, it will be captured here.
         result.extend(ix.data)
 
-    # Recent blockhash
-    result.extend(bytes(message.recent_blockhash))
+        # NOTE: We intentionally exclude 'ix.accounts' and 'message.header'.
+        # These fields are often modified by RPC nodes (resolving ALT lookups),
+        # causing hash mismatches even for the same logical transaction.
 
     return bytes(result)
 
