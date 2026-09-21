@@ -4,6 +4,8 @@ import base58
 from solders.transaction import (Transaction as SoldersLegacyTransaction,
                                  VersionedTransaction as SoldersVersionedTransaction)
 
+from .tx_v1_decode import is_v1_transaction, rebuild_versioned_tx_from_v1_bytes
+
 
 def try_build_versioned_tx_from_base64(tx_base64: str, raise_on_error: bool = True) -> SoldersVersionedTransaction | None:
     try:
@@ -49,6 +51,15 @@ def try_build_versioned_tx_from_bytes(tx_raw_bytes: bytes, raise_on_error: bool 
     try:
         return SoldersVersionedTransaction.from_bytes(tx_raw_bytes)
     except Exception:
+        # solders cannot parse a Transaction v1 (SIMD-0296/0385, version byte 0x81).
+        # A v1 tx has no address lookup tables and <=64 inline accounts, so it maps
+        # losslessly onto a MessageV0 — rebuild an equivalent VersionedTransaction so
+        # every downstream helper (hashing, from_solders_transaction, ...) works on v1.
+        if is_v1_transaction(tx_raw_bytes):
+            try:
+                return rebuild_versioned_tx_from_v1_bytes(tx_raw_bytes)
+            except Exception:
+                pass
         if raise_on_error:
             raise
 
